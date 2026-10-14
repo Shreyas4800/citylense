@@ -7,12 +7,16 @@ import PublicFeedPage from './pages/PublicFeedPage';
 import ReportIssuePage from './pages/ReportIssuePage';
 import AdminPage from './pages/AdminPage';
 import { LoginPage, SignupPage } from './pages/AuthPages';
-import { FALLBACK_ISSUES } from './data/seedIssues';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://citylense.onrender.com';
+export const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  (window.location.hostname === 'localhost'
+    ? 'http://localhost:5000'
+    : 'https://citylense.onrender.com');
 
 export default function App() {
-  const [issues, setIssues] = useState(FALLBACK_ISSUES);
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('citylense_active_user');
@@ -26,35 +30,31 @@ export default function App() {
     try {
       const res = await axios.get(`${API_BASE}/api/reports`);
       if (Array.isArray(res.data)) {
-        const dbIssues = res.data.map((row) => ({
-          ...row,
-          title: row.title || `${row.category} Defect — ${row.jurisdiction || 'Municipal Zone'}`,
-          description: row.description || row.ai_summary,
-          status: row.status || 'verified',
-          date: row.created_at ? new Date(row.created_at).toLocaleString() : 'Verified in DB',
-          upvotes: row.upvotes || 1
-        }));
-
-        const dbRefIds = new Set(dbIssues.map((d) => d.reference_id));
-        const remainingSeeds = FALLBACK_ISSUES.filter((s) => !dbRefIds.has(s.reference_id));
-        setIssues([...dbIssues, ...remainingSeeds]);
+        setIssues(res.data);
       }
     } catch (err) {
-      console.error('Live feed sync error:', err.message);
+      // Fallback to Render cloud URL if local server is stopped
+      if (API_BASE.includes('localhost')) {
+        try {
+          const cloudRes = await axios.get('https://citylense.onrender.com/api/reports');
+          if (Array.isArray(cloudRes.data)) {
+            setIssues(cloudRes.data);
+          }
+        } catch {}
+      }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchLiveReports();
-    const interval = setInterval(fetchLiveReports, 6000);
+    const interval = setInterval(fetchLiveReports, 5000);
     return () => clearInterval(interval);
   }, [fetchLiveReports]);
 
   const handleReportCreated = (newIssue) => {
-    setIssues((prev) => {
-      const filtered = prev.filter((i) => i.reference_id !== newIssue.reference_id);
-      return [newIssue, ...filtered];
-    });
+    setIssues((prev) => [newIssue, ...prev.filter((i) => i.reference_id !== newIssue.reference_id)]);
     setTimeout(fetchLiveReports, 1000);
   };
 
@@ -87,10 +87,18 @@ export default function App() {
       <div className="min-h-screen bg-[#F5F3EE] text-[#121316]">
         <Navbar user={user} onLogout={handleLogout} />
         <Routes>
-          <Route path="/" element={<HomePage issues={issues} />} />
+          <Route path="/" element={<HomePage issues={issues} loading={loading} />} />
           <Route
             path="/feed"
-            element={<PublicFeedPage issues={issues} onUpvote={handleUpvote} user={user} />}
+            element={
+              <PublicFeedPage
+                issues={issues}
+                loading={loading}
+                onUpvote={handleUpvote}
+                onRefresh={fetchLiveReports}
+                user={user}
+              />
+            }
           />
           <Route
             path="/report"

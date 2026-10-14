@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import IssueMap from '../components/IssueMap';
-import { MUNICIPALITIES, BULLETINS } from '../data/seedIssues';
+import { MUNICIPALITIES } from '../data/seedIssues';
 
-export default function PublicFeedPage({ issues, onUpvote, user }) {
+export default function PublicFeedPage({ issues = [], loading, onUpvote, onRefresh, user }) {
   const [activeTab, setActiveTab] = useState('feed');
   const [selectedMunicipality, setSelectedMunicipality] = useState('All Jurisdictions');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -17,9 +17,11 @@ export default function PublicFeedPage({ issues, onUpvote, user }) {
     'Water & Drainage',
     'Health & SWM',
     'Electricity',
-    'Environment & Gardens'
+    'Environment & Gardens',
+    'Encroachment & Estate'
   ];
 
+  // Dynamic filtered issues
   const filteredIssues = issues.filter((issue) => {
     const matchesCity =
       selectedMunicipality === 'All Jurisdictions' ||
@@ -30,24 +32,42 @@ export default function PublicFeedPage({ issues, onUpvote, user }) {
     return matchesCity && matchesCat;
   });
 
-  const municipalityBreakdown = MUNICIPALITIES.slice(1)
-    .map((city) => {
-      const cityIssues = issues.filter((i) => i.jurisdiction === city);
-      return {
-        city,
-        total: cityIssues.length
-      };
-    })
-    .filter((row) => row.total > 0);
+  // Dynamic Analytics Calculations from real DB issues
+  const totalCount = issues.length;
+  const resolvedCount = issues.filter((i) => i.status === 'resolved').length;
+  const inProgressCount = issues.filter((i) => i.status === 'in-progress').length;
+  const verifiedOpenCount = totalCount - resolvedCount - inProgressCount;
+  const avgConfidence =
+    totalCount > 0
+      ? Math.round(
+          (issues.reduce((acc, i) => acc + (Number(i.confidence) || 0.92), 0) / totalCount) * 100
+        )
+      : 0;
+
+  // Dynamic Municipality Breakdown
+  const cityCountsMap = {};
+  issues.forEach((i) => {
+    const c = i.jurisdiction || 'Kolhapur (KMC)';
+    if (!cityCountsMap[c]) cityCountsMap[c] = { city: c, total: 0, resolved: 0, pending: 0 };
+    cityCountsMap[c].total += 1;
+    if (i.status === 'resolved') cityCountsMap[c].resolved += 1;
+    else cityCountsMap[c].pending += 1;
+  });
+  const municipalityBreakdown = Object.values(cityCountsMap).sort((a, b) => b.total - a.total);
+
+  // Dynamic Category Wing Breakdown
+  const categoryCountsMap = {};
+  issues.forEach((i) => {
+    const cat = i.category || 'Roads & Infra';
+    if (!categoryCountsMap[cat]) categoryCountsMap[cat] = { category: cat, total: 0 };
+    categoryCountsMap[cat].total += 1;
+  });
+  const categoryBreakdown = Object.values(categoryCountsMap).sort((a, b) => b.total - a.total);
 
   const openEmailModal = (issue) => {
     const lat = Number(issue.latitude).toFixed(6);
     const lng = Number(issue.longitude).toFixed(6);
-    const targetEmail =
-      issue.department_email ||
-      issue.email_roads ||
-      issue.email_nodal ||
-      'nodal@maharashtra.gov.in';
+    const targetEmail = issue.department_email || 'nodal@maharashtra.gov.in';
 
     const subject = `[OFFICIAL CIVIC DOCKET #${issue.reference_id}] Escalation Notice: ${issue.category} (${issue.jurisdiction})`;
     const body = `To,
@@ -64,8 +84,9 @@ Please find below the verified telemetry and AI inspection summary for an active
 - Category         : ${issue.category} (AI Confidence: ${Math.round((issue.confidence || 0.95) * 100)}%)
 - Summary          : ${issue.ai_summary || issue.description}
 - Coordinates      : ${lat}° N, ${lng}° E
-- Google Maps Link : https://www.google.com/maps?q=${lat},${lng}
-- Citizen Upvotes  : ${issue.upvotes || 1} Endorsements
+- Google Maps Pin  : https://www.google.com/maps?q=${lat},${lng}
+- Logged Timestamp : ${issue.date}
+- Evidence Image   : ${issue.image_url}
 
 We request immediate departmental inspection and resolution.
 
@@ -82,22 +103,27 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
   return (
     <div className="min-h-screen bg-[#F5F3EE] py-8 pb-24 md:pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        
+        {/* Header */}
         <div className="bg-white border-2 border-[#121316] p-6 hard-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <span className="font-mono text-xs font-bold uppercase tracking-widest text-[#D94E28]">
-              // PUBLIC CIVIC REGISTRY &amp; TELEMETRY
+              // LIVE POSTGRESQL &amp; AZURE BLOB REGISTRY ({issues.length} DOCKETS)
             </span>
             <h1 className="font-display text-3xl font-bold text-[#121316] mt-1">
               Municipal Inspection Dockets
             </h1>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <label htmlFor="jurisdiction-select" className="font-mono text-xs uppercase font-bold text-[#121316]">
-              Filter Corporation:
-            </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="bg-[#121316] hover:bg-[#D94E28] text-white font-mono text-xs uppercase font-bold px-3.5 py-2.5 border-2 border-[#121316] cursor-pointer"
+            >
+              ↻ Sync Live DB
+            </button>
             <select
-              id="jurisdiction-select"
               value={selectedMunicipality}
               onChange={(e) => setSelectedMunicipality(e.target.value)}
               className="bg-[#F5F3EE] border-2 border-[#121316] text-[#121316] font-mono text-xs px-3 py-2.5 font-semibold focus:outline-none"
@@ -109,12 +135,13 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
           </div>
         </div>
 
+        {/* 4 Tabs */}
         <div className="flex flex-wrap border-2 border-[#121316] bg-white">
           {[
-            { id: 'feed', label: '01 // Live Dockets' },
-            { id: 'map', label: '02 // GIS Map Workbench' },
-            { id: 'analytics', label: '03 // Corporation Analytics' },
-            { id: 'history', label: '04 // Dispatch Audit Log' }
+            { id: 'feed', label: `01 // Live Feed (${filteredIssues.length})` },
+            { id: 'map', label: `02 // GIS Map (${filteredIssues.length})` },
+            { id: 'analytics', label: '03 // Live Analytics' },
+            { id: 'history', label: `04 // Audit History (${issues.length})` }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -130,6 +157,7 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
           ))}
         </div>
 
+        {/* TAB 1: LIVE FEED */}
         {activeTab === 'feed' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-8 space-y-4">
@@ -150,9 +178,13 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                 ))}
               </div>
 
-              {filteredIssues.length === 0 ? (
+              {loading ? (
+                <div className="bg-white border-2 border-[#121316] p-12 text-center font-mono text-sm text-[#121316]">
+                  SYNCING LIVE REPORTS FROM AZURE POSTGRESQL...
+                </div>
+              ) : filteredIssues.length === 0 ? (
                 <div className="bg-white border-2 border-[#121316] p-12 text-center font-mono text-sm text-[#4A4D55]">
-                  NO VERIFIED DOCKETS MATCH CURRENT FILTER PARAMETERS.
+                  NO DOCKETS FOUND FOR THIS FILTER. SUBMIT A REPORT TO POPULATE THE LEDGER.
                 </div>
               ) : (
                 filteredIssues.map((issue) => (
@@ -160,7 +192,7 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                     key={issue.id || issue.reference_id}
                     className="bg-white border-2 border-[#121316] hard-shadow flex flex-col sm:flex-row overflow-hidden"
                   >
-                    <div className="w-full sm:w-56 h-48 sm:h-auto bg-[#E5E2D9] shrink-0 border-b-2 sm:border-b-0 sm:border-r-2 border-[#121316] relative">
+                    <div className="w-full sm:w-60 h-52 sm:h-auto bg-[#E5E2D9] shrink-0 border-b-2 sm:border-b-0 sm:border-r-2 border-[#121316] relative">
                       <img
                         src={issue.image_url}
                         alt={issue.category}
@@ -168,6 +200,9 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                       />
                       <span className="absolute top-2 left-2 bg-[#121316] text-white font-mono text-[10px] font-bold px-2 py-0.5">
                         {issue.reference_id}
+                      </span>
+                      <span className="absolute bottom-2 left-2 bg-[#121316]/90 text-white font-mono text-[10px] px-2 py-0.5">
+                        {(issue.status || 'verified').toUpperCase()}
                       </span>
                     </div>
 
@@ -182,7 +217,7 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                               AI CONF: {Math.round((issue.confidence || 0.95) * 100)}%
                             </span>
                           </div>
-                          <span className="font-mono text-[11px] text-[#4A4D55]">{issue.date || 'LOGGED'}</span>
+                          <span className="font-mono text-[11px] text-[#4A4D55]">{issue.date}</span>
                         </div>
 
                         <h3 className="font-display text-lg font-bold text-[#121316] mb-1.5">
@@ -223,16 +258,17 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
               )}
             </div>
 
+            {/* Dynamic Sidebar */}
             <aside className="lg:col-span-4 space-y-6">
               <div className="bg-white border-2 border-[#121316] p-5 hard-shadow">
                 <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-[#121316] pb-3 mb-4 border-b-2 border-[#121316]">
-                  // PRIORITY ESCALATION QUEUE
+                  // TOP ENDORSED DOCKETS (LIVE)
                 </h3>
                 <div className="space-y-3">
                   {issues
                     .slice()
                     .sort((a, b) => (b.upvotes || 1) - (a.upvotes || 1))
-                    .slice(0, 4)
+                    .slice(0, 5)
                     .map((item, idx) => (
                       <div key={item.reference_id} className="flex items-start gap-3 pb-3 border-b border-[#D8D4C8] last:border-b-0 last:pb-0">
                         <span className="w-6 h-6 bg-[#121316] text-white font-mono font-bold text-xs flex items-center justify-center shrink-0">
@@ -240,7 +276,7 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-[#121316] truncate">
-                            {item.title || `${item.category} (${item.jurisdiction})`}
+                            {item.reference_id} — {item.category}
                           </p>
                           <span className="font-mono text-[11px] text-[#D94E28] font-semibold">
                             {item.jurisdiction} // {item.upvotes || 1} ENDORSEMENTS
@@ -253,16 +289,18 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
 
               <div className="bg-white border-2 border-[#121316] p-5 hard-shadow">
                 <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-[#121316] pb-3 mb-4 border-b-2 border-[#121316]">
-                  // MUNICIPAL GAZETTE BULLETINS
+                  // LIVE CORPORATION SUMMARY
                 </h3>
                 <div className="space-y-3">
-                  {BULLETINS.map((b) => (
-                    <div key={b.id} className="bg-[#F5F3EE] border border-[#121316] p-3.5">
-                      <h4 className="font-display font-bold text-sm text-[#121316]">{b.title}</h4>
-                      <p className="text-xs text-[#4A4D55] mt-0.5">{b.subtitle}</p>
-                      <div className="mt-2 pt-2 border-t border-[#D8D4C8] flex items-center justify-between font-mono text-[11px] text-[#121316]">
-                        <span>{b.stats.reported} LOGGED / {b.stats.resolved} CLOSED</span>
-                        <span className="font-bold">{b.date}</span>
+                  {municipalityBreakdown.map((m) => (
+                    <div key={m.city} className="bg-[#F5F3EE] border border-[#121316] p-3 font-mono text-xs">
+                      <div className="flex justify-between font-bold text-[#121316]">
+                        <span>{m.city}</span>
+                        <span>{m.total} DOCKETS</span>
+                      </div>
+                      <div className="mt-1 flex justify-between text-[11px] text-[#4A4D55]">
+                        <span>Active: {m.pending}</span>
+                        <span className="text-[#1B4332] font-bold">Resolved: {m.resolved}</span>
                       </div>
                     </div>
                   ))}
@@ -272,78 +310,123 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
           </div>
         )}
 
+        {/* TAB 2: GIS MAP */}
         {activeTab === 'map' && (
           <div className="bg-white border-2 border-[#121316] hard-shadow overflow-hidden h-[540px]">
             <IssueMap issues={filteredIssues} />
           </div>
         )}
 
+        {/* TAB 3: 100% DYNAMIC ANALYTICS */}
         {activeTab === 'analytics' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
-              <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
-                Docket Distribution by Municipal Corporation
-              </h3>
-              <div className="space-y-4">
-                {municipalityBreakdown.map((item) => (
-                  <div key={item.city} className="space-y-1.5">
-                    <div className="flex justify-between font-mono text-xs">
-                      <span className="font-bold text-[#121316]">{item.city}</span>
-                      <span>{item.total} DOCKETS</span>
-                    </div>
-                    <div className="w-full h-3 bg-[#F5F3EE] border border-[#121316]">
-                      <div
-                        className="h-full bg-[#D94E28]"
-                        style={{ width: `${Math.min(100, (item.total / issues.length) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
+                <span className="font-mono text-xs uppercase text-[#4A4D55]">Total Logged Issues</span>
+                <p className="font-display text-3xl font-bold text-[#121316] mt-1">{totalCount}</p>
+              </div>
+              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
+                <span className="font-mono text-xs uppercase text-[#4A4D55]">Verified &amp; Open</span>
+                <p className="font-display text-3xl font-bold text-[#D94E28] mt-1">{verifiedOpenCount}</p>
+              </div>
+              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
+                <span className="font-mono text-xs uppercase text-[#4A4D55]">Resolved Dockets</span>
+                <p className="font-display text-3xl font-bold text-[#1B4332] mt-1">{resolvedCount}</p>
+              </div>
+              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
+                <span className="font-mono text-xs uppercase text-[#4A4D55]">Mean AI Confidence</span>
+                <p className="font-display text-3xl font-bold text-[#121316] mt-1">{avgConfidence}%</p>
               </div>
             </div>
 
-            <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
-              <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
-                Published Departmental SLA Audits
-              </h3>
-              <div className="space-y-3">
-                {BULLETINS.map((nl) => (
-                  <div key={nl.id} className="p-4 bg-[#F5F3EE] border border-[#121316] flex items-center justify-between">
-                    <div>
-                      <h4 className="font-display font-bold text-[#121316] text-sm">{nl.title}</h4>
-                      <p className="text-xs text-[#4A4D55]">{nl.subtitle} &bull; {nl.date}</p>
-                      <div className="flex gap-4 mt-2 font-mono text-xs font-semibold">
-                        <span className="text-[#D94E28]">{nl.stats.reported} REPORTED</span>
-                        <span className="text-[#1B4332]">{nl.stats.resolved} RESOLVED</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
+                <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
+                  Live Dockets by Municipal Corporation
+                </h3>
+                <div className="space-y-4">
+                  {municipalityBreakdown.map((item) => (
+                    <div key={item.city} className="space-y-1.5">
+                      <div className="flex justify-between font-mono text-xs">
+                        <span className="font-bold text-[#121316]">{item.city}</span>
+                        <span>{item.total} REPORTS ({Math.round((item.total / (totalCount || 1)) * 100)}%)</span>
+                      </div>
+                      <div className="w-full h-3 bg-[#F5F3EE] border border-[#121316]">
+                        <div
+                          className="h-full bg-[#D94E28]"
+                          style={{ width: `${Math.min(100, (item.total / (totalCount || 1)) * 100)}%` }}
+                        />
                       </div>
                     </div>
-                    <span className="font-mono text-xs font-bold bg-[#121316] text-white px-2.5 py-1">LOG</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
+                <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
+                  Live Dockets by Departmental Wing
+                </h3>
+                <div className="space-y-4">
+                  {categoryBreakdown.map((item) => (
+                    <div key={item.category} className="space-y-1.5">
+                      <div className="flex justify-between font-mono text-xs">
+                        <span className="font-bold text-[#121316]">{item.category}</span>
+                        <span>{item.total} REPORTS ({Math.round((item.total / (totalCount || 1)) * 100)}%)</span>
+                      </div>
+                      <div className="w-full h-3 bg-[#F5F3EE] border border-[#121316]">
+                        <div
+                          className="h-full bg-[#121316]"
+                          style={{ width: `${Math.min(100, (item.total / (totalCount || 1)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* TAB 4: 100% DYNAMIC AUDIT HISTORY */}
         {activeTab === 'history' && (
           <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
             <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
-              Immutable Spatial Routing Ledger
+              Chronological PostgreSQL Dispatch Ledger ({issues.length} Records)
             </h3>
             <div className="divide-y divide-[#D8D4C8] font-mono text-xs">
               {issues.map((item) => (
-                <div key={item.id || item.reference_id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold bg-[#121316] text-white px-2 py-1">
-                      {item.reference_id}
-                    </span>
-                    <span className="text-[#121316]">
-                      CLASSIFIED AS <strong>[{item.category}]</strong> &rarr; DISPATCHED TO <strong>{item.jurisdiction}</strong>
+                <div key={item.id || item.reference_id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <img
+                      src={item.image_url}
+                      alt={item.reference_id}
+                      className="w-12 h-12 object-cover border border-[#121316] shrink-0"
+                    />
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold bg-[#121316] text-white px-2 py-0.5">
+                          {item.reference_id}
+                        </span>
+                        <span className="font-bold text-[#D94E28]">
+                          [{item.category}]
+                        </span>
+                        <span className="text-[#121316] font-bold">
+                          &rarr; {item.jurisdiction}
+                        </span>
+                        <span className="text-[#1B4332]">
+                          ({item.department_email})
+                        </span>
+                      </div>
+                      <p className="text-[#4A4D55] mt-1 line-clamp-1">
+                        {item.ai_summary || item.description}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="inline-block bg-[#F5F3EE] border border-[#121316] px-2 py-1 font-bold">
+                      {item.date}
                     </span>
                   </div>
-                  <span className="text-[#4A4D55]">
-                    {item.date || new Date(item.created_at).toLocaleString()}
-                  </span>
                 </div>
               ))}
             </div>
@@ -351,7 +434,7 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
         )}
       </div>
 
-      {/* Modal for Legal Notice Dispatch from Public Feed */}
+      {/* Legal Email Modal */}
       {draftModalIssue && (
         <div className="fixed inset-0 z-50 bg-[#121316]/80 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-[#121316] hard-shadow max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
