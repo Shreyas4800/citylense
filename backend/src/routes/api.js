@@ -6,9 +6,7 @@ const {
     updateReportStatus, 
     upvoteReport,
     registerUser,
-    loginUser,
-    getSettings,
-    updateSettings
+    loginUser
 } = require('../controllers/reportController');
 
 const router = express.Router();
@@ -26,8 +24,5 @@ router.post('/reports/:refId/upvote', upvoteReport);
 
 router.post('/auth/signup', registerUser);
 router.post('/auth/login', loginUser);
-
-router.get('/admin/settings', getSettings);
-router.post('/admin/settings', updateSettings);
 
 module.exports = router;

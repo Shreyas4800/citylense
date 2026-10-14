@@ -1,7 +1,7 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 require('dotenv').config();
 
-const CONTAINER_NAME = process.env.AZURE_CONTAINER_NAME || 'evidence';
+const CONTAINER_NAME = process.env.AZURE_CONTAINER_NAME || 'citylense-evidence';
 
 const uploadImageToAzure = async (buffer, fileName) => {
     try {

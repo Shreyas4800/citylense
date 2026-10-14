@@ -64,74 +64,6 @@ const generateAutomatedSocialPost = ({ refId, city, category, title, summary, la
     return `🚨 [AI-VERIFIED CIVIC DOCKET #${refId}]\n📍 Jurisdiction: ${city}\n🛠 Wing: ${category}\n📌 Issue: ${title || category}\n\n📋 AI Inspection: ${summary}\n\n🗺 Telemetry Pin: ${mapsLink}\n\ncc: Official Nodal Officer — Requesting time-bound rectification.\n#${cleanCityTag} #${cleanCatTag} #CityLense #CivicAccountability`;
 };
 
-const postToXApiV2 = async (text) => {
-    const { X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET } = process.env;
-    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_SECRET) return false;
-
-    const url = 'https://api.x.com/2/tweets';
-    const oauth = {
-        oauth_consumer_key: X_API_KEY,
-        oauth_nonce: crypto.randomBytes(16).toString('hex'),
-        oauth_signature_method: 'HMAC-SHA1',
-        oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-        oauth_token: X_ACCESS_TOKEN,
-        oauth_version: '1.0'
-    };
-
-    const paramString = Object.keys(oauth)
-        .sort()
-        .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(oauth[k])}`)
-        .join('&');
-
-    const baseString = `POST&${encodeURIComponent(url)}&${encodeURIComponent(paramString)}`;
-    const signingKey = `${encodeURIComponent(X_API_SECRET)}&${encodeURIComponent(X_ACCESS_SECRET)}`;
-    oauth.oauth_signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
-
-    const authHeader =
-        'OAuth ' +
-        Object.keys(oauth)
-            .sort()
-            .map((k) => `${encodeURIComponent(k)}="${encodeURIComponent(oauth[k])}"`)
-            .join(', ');
-
-    await axios.post(url, { text }, { headers: { Authorization: authHeader, 'Content-Type': 'application/json' } });
-    return true;
-};
-
-const autoBroadcastSocial = async ({ socialPost, imageUrl, refId, city, category }) => {
-    let posted = false;
-    let webhookUrl = process.env.SOCIAL_WEBHOOK_URL || '';
-
-    if (!webhookUrl) {
-        try {
-            const res = await query(`SELECT setting_value FROM system_settings WHERE setting_key = 'webhook_url'`);
-            if (res.rows.length > 0) webhookUrl = res.rows[0].setting_value;
-        } catch {}
-    }
-
-    if (webhookUrl) {
-        try {
-            await axios.post(webhookUrl, {
-                content: socialPost,
-                username: 'CityLense AI Dispatch',
-                embeds: imageUrl ? [{ title: `Docket #${refId} — ${city} (${category})`, image: { url: imageUrl } }] : []
-            });
-            posted = true;
-        } catch (err) {
-            console.error('Webhook auto-post warning:', err.message);
-        }
-    }
-
-    try {
-        const xSuccess = await postToXApiV2(socialPost);
-        if (xSuccess) posted = true;
-    } catch (err) {
-        console.error('X API auto-post warning:', err.message);
-    }
-
-    return posted;
-};
-
 const handleIncomingReport = async (req, res) => {
     try {
         await ensureDatabaseSchema();
@@ -221,14 +153,6 @@ const handleIncomingReport = async (req, res) => {
             lng
         });
 
-        const wasAutoPosted = await autoBroadcastSocial({
-            socialPost: autoSocialPost,
-            imageUrl,
-            refId,
-            city: nearestCity.name,
-            category: aiData.category
-        });
-
         const insertQuery = `
             INSERT INTO complaints (
                 municipality_id, reference_id, category, confidence, ai_summary, 
@@ -240,7 +164,7 @@ const handleIncomingReport = async (req, res) => {
                 $1, $2, $3, $4, $5, 
                 $6, $7, $8, ST_SetSRID(ST_MakePoint($9, $10), 4326),
                 $11, $12, $13, $14, $15,
-                'verified', 1, $16, $17
+                'verified', 1, $16, false
             )
             RETURNING *;
         `;
@@ -249,7 +173,7 @@ const handleIncomingReport = async (req, res) => {
             nearestCity.id, refId, aiData.category, aiData.confidence, aiData.summary,
             imageUrl, lat, lng, lng, lat,
             finalTitle, finalDesc, locationName || nearestCity.name, reporterName || 'Citizen Reporter', reporterEmail || '',
-            autoSocialPost, wasAutoPosted
+            autoSocialPost
         ]);
 
         res.status(200).json({
@@ -264,7 +188,6 @@ const handleIncomingReport = async (req, res) => {
             title: finalTitle,
             description: finalDesc,
             social_post: autoSocialPost,
-            social_posted: wasAutoPosted,
             ai_classification: aiData
         });
 
@@ -429,41 +352,11 @@ const loginUser = async (req, res) => {
     }
 };
 
-const getSettings = async (req, res) => {
-    try {
-        await ensureDatabaseSchema();
-        const result = await query(`SELECT setting_key, setting_value FROM system_settings;`);
-        const settings = {};
-        result.rows.forEach((r) => { settings[r.setting_key] = r.setting_value; });
-        res.status(200).json(settings);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to load settings.' });
-    }
-};
-
-const updateSettings = async (req, res) => {
-    try {
-        await ensureDatabaseSchema();
-        const { webhook_url } = req.body;
-        await query(
-            `INSERT INTO system_settings (setting_key, setting_value)
-             VALUES ('webhook_url', $1)
-             ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value;`,
-            [webhook_url || '']
-        );
-        res.status(200).json({ success: true, webhook_url });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to save settings.' });
-    }
-};
-
 module.exports = { 
     handleIncomingReport, 
     getReports, 
     updateReportStatus, 
     upvoteReport,
     registerUser,
-    loginUser,
-    getSettings,
-    updateSettings
+    loginUser
 };

@@ -9,7 +9,7 @@ import AdminPage from './pages/AdminPage';
 import { LoginPage, SignupPage } from './pages/AuthPages';
 import { FALLBACK_ISSUES } from './data/seedIssues';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://citylense.onrender.com';
 
 export default function App() {
   const [issues, setIssues] = useState(FALLBACK_ISSUES);
@@ -29,9 +29,9 @@ export default function App() {
         const dbIssues = res.data.map((row) => ({
           ...row,
           title: row.title || `${row.category} Defect — ${row.jurisdiction || 'Municipal Zone'}`,
-          description: row.ai_summary,
+          description: row.description || row.ai_summary,
           status: row.status || 'verified',
-          date: row.created_at ? new Date(row.created_at).toLocaleString() : 'Logged in DB',
+          date: row.created_at ? new Date(row.created_at).toLocaleString() : 'Verified in DB',
           upvotes: row.upvotes || 1
         }));
 
@@ -39,14 +39,14 @@ export default function App() {
         const remainingSeeds = FALLBACK_ISSUES.filter((s) => !dbRefIds.has(s.reference_id));
         setIssues([...dbIssues, ...remainingSeeds]);
       }
-    } catch {
-      // Keeps current state if backend is momentarily unreachable
+    } catch (err) {
+      console.error('Live feed sync error:', err.message);
     }
   }, []);
 
   useEffect(() => {
     fetchLiveReports();
-    const interval = setInterval(fetchLiveReports, 8000);
+    const interval = setInterval(fetchLiveReports, 6000);
     return () => clearInterval(interval);
   }, [fetchLiveReports]);
 
@@ -55,7 +55,7 @@ export default function App() {
       const filtered = prev.filter((i) => i.reference_id !== newIssue.reference_id);
       return [newIssue, ...filtered];
     });
-    fetchLiveReports();
+    setTimeout(fetchLiveReports, 1000);
   };
 
   const handleUpvote = async (refId) => {

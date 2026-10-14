@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://citylense.onrender.com';
 
 const PRESET_COORDS = [
   { label: 'Ichalkaranji (IMC)', lat: '16.6966', lng: '74.4593' },
