@@ -56,29 +56,41 @@ export default function PublicFeedPage({ issues = [], loading, onUpvote, onRefre
     const lng = Number(issue.longitude).toFixed(6);
     const targetEmail = issue.department_email || 'nodal@maharashtra.gov.in';
 
-    const subject = `[Docket #${issue.reference_id}] ${issue.category} Issue — ${issue.jurisdiction}`;
+    const subject = `[OFFICIAL CIVIC DOCKET #${issue.reference_id}] Urgent ${issue.category} Defect Notice — ${issue.jurisdiction}`;
     const body = `To,
-The Nodal Officer (${issue.category}),
-${issue.jurisdiction} Municipal Corporation.
+The Nodal Officer / Executive Engineer (${issue.category} Wing),
+${issue.jurisdiction} Municipal Corporation,
+Maharashtra State.
 
-Subject: Urgent Action Requested for Verified Docket #${issue.reference_id}
+SUBJECT: Statutory Civic Defect Notice & Request for Time-Bound Rectification [Docket Ref: ${issue.reference_id}]
 
 Respected Sir / Madam,
 
-Please find the details of a verified civic defect in ${issue.jurisdiction}:
+Please find below the verified spatial telemetry and AI computer vision inspection summary for an active civic defect in ${issue.jurisdiction}:
 
-- Reference ID : ${issue.reference_id}
-- Category     : ${issue.category}
-- Assessment   : ${issue.ai_summary || issue.description}
-- Coordinates  : ${lat}° N, ${lng}° E
-- Google Maps  : https://www.google.com/maps?q=${lat},${lng}
-- Photo URL    : ${issue.image_url}
+1. DOCKET & SPATIAL TELEMETRY
+--------------------------------------------------
+- Reference Docket ID : ${issue.reference_id}
+- Jurisdiction        : ${issue.jurisdiction}
+- PostGIS Coordinates : ${lat}° N, ${lng}° E (WGS 84)
+- Google Maps Pin     : https://www.google.com/maps?q=${lat},${lng}
+- Logged Timestamp    : ${issue.date}
 
-Kindly initiate field inspection and resolution.
+2. AI COMPUTER VISION TECHNICAL ASSESSMENT
+--------------------------------------------------
+- Assigned Department : ${issue.category}
+- AI Confidence Score : ${Math.round((issue.confidence || 0.95) * 100)}%
+- Technical Summary   : ${issue.ai_summary || issue.description}
+- Cloud Evidence URL  : ${issue.image_url}
+- Citizen Priority    : ${issue.upvotes || 1} Public Endorsements
+
+3. STATUTORY REQUEST FOR ACTION
+--------------------------------------------------
+Pursuant to obligatory municipal duties under the Maharashtra Municipal Corporations Act regarding public safety and civic maintenance, we request immediate field inspection and remedial work.
 
 Sincerely,
-${user?.name || 'Citizen Reporter'}
-${user?.email || ''}`;
+${user?.name || 'Registered Citizen Reporter'}
+${user?.email || 'Dispatched via CityLense Public Registry'}`;
 
     setDraftTo(targetEmail);
     setDraftSubject(subject);
@@ -90,7 +102,7 @@ ${user?.email || ''}`;
     <div className="min-h-screen bg-[#F5F3EE] py-6 pb-24 md:pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
         
-        {/* Compact Header */}
+        {/* Header */}
         <div className="bg-white border-2 border-[#121316] p-4 sm:p-5 hard-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h1 className="font-display text-2xl font-bold text-[#121316]">
             Public Feed ({filteredIssues.length})
@@ -116,7 +128,7 @@ ${user?.email || ''}`;
           </div>
         </div>
 
-        {/* Clean 4-Tab Bar */}
+        {/* 4-Tab Bar */}
         <div className="grid grid-cols-4 border-2 border-[#121316] bg-white">
           {[
             { id: 'feed', label: 'Feed' },
@@ -173,7 +185,7 @@ ${user?.email || ''}`;
                     className="bg-white border-2 border-[#121316] hard-shadow flex flex-col justify-between overflow-hidden"
                   >
                     <div>
-                      <div className="h-48 bg-[#E5E2D9] border-b-2 border-[#121316] relative">
+                      <div className="h-52 bg-[#E5E2D9] border-b-2 border-[#121316] relative">
                         <img
                           src={issue.image_url}
                           alt={issue.category}
@@ -182,17 +194,20 @@ ${user?.email || ''}`;
                         <span className="absolute top-2 left-2 bg-[#121316] text-white font-mono text-[10px] font-bold px-2 py-0.5">
                           {issue.reference_id}
                         </span>
-                        <span className="absolute top-2 right-2 bg-white text-[#121316] border border-[#121316] font-mono text-[10px] font-bold px-2 py-0.5">
-                          {issue.category}
+                        <span className="absolute top-2 right-2 bg-[#D8F3DC] text-[#1B4332] border border-[#1B4332] font-mono text-[10px] font-bold px-2 py-0.5">
+                          AI CONF: {Math.round((issue.confidence || 0.95) * 100)}%
+                        </span>
+                        <span className="absolute bottom-2 left-2 bg-[#121316]/90 text-white font-mono text-[10px] px-2 py-0.5">
+                          {Number(issue.latitude).toFixed(4)}°N, {Number(issue.longitude).toFixed(4)}°E
                         </span>
                       </div>
 
                       <div className="p-4">
                         <div className="flex items-center justify-between font-mono text-xs mb-1.5">
-                          <span className="font-bold text-[#D94E28]">{issue.jurisdiction}</span>
+                          <span className="font-bold text-[#D94E28]">{issue.jurisdiction} &bull; {issue.category}</span>
                           <span className="text-[#4A4D55] text-[11px]">{issue.date}</span>
                         </div>
-                        <p className="text-sm text-[#121316] leading-relaxed line-clamp-3">
+                        <p className="text-sm text-[#121316] leading-relaxed">
                           {issue.ai_summary || issue.description}
                         </p>
                       </div>
@@ -203,13 +218,13 @@ ${user?.email || ''}`;
                         onClick={() => openEmailModal(issue)}
                         className="bg-[#D94E28] hover:bg-[#b83d1b] text-white border border-[#121316] px-3 py-1.5 font-bold cursor-pointer"
                       >
-                        ✉ Legal Email
+                        ✉ Draft Legal Email
                       </button>
                       <button
                         onClick={() => onUpvote(issue.reference_id)}
                         className="bg-white hover:bg-[#121316] hover:text-white text-[#121316] border border-[#121316] px-3 py-1.5 font-bold cursor-pointer"
                       >
-                        ▲ Upvote ({issue.upvotes || 1})
+                        ▲ Endorse ({issue.upvotes || 1})
                       </button>
                     </div>
                   </div>
@@ -297,23 +312,26 @@ ${user?.email || ''}`;
           <div className="bg-white border-2 border-[#121316] p-4 sm:p-6 hard-shadow">
             <div className="divide-y divide-[#D8D4C8] font-mono text-xs">
               {issues.map((item) => (
-                <div key={item.id || item.reference_id} className="py-3 flex items-center justify-between gap-3">
+                <div key={item.id || item.reference_id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={item.image_url}
                       alt={item.reference_id}
-                      className="w-10 h-10 object-cover border border-[#121316] shrink-0"
+                      className="w-11 h-11 object-cover border border-[#121316] shrink-0"
                     />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold bg-[#121316] text-white px-1.5 py-0.5 text-[10px]">
                           {item.reference_id}
                         </span>
-                        <span className="font-bold text-[#D94E28] truncate">
+                        <span className="font-bold text-[#D94E28]">
                           {item.jurisdiction}
                         </span>
+                        <span className="text-[#4A4D55]">
+                          ({Number(item.latitude).toFixed(4)}°N, {Number(item.longitude).toFixed(4)}°E)
+                        </span>
                       </div>
-                      <p className="text-[#4A4D55] truncate mt-0.5">{item.category}</p>
+                      <p className="text-[#121316] truncate mt-0.5">{item.ai_summary || item.description}</p>
                     </div>
                   </div>
                   <span className="text-[11px] text-[#4A4D55] shrink-0">{item.date}</span>
@@ -324,25 +342,30 @@ ${user?.email || ''}`;
         )}
       </div>
 
-      {/* Legal Email Modal */}
+      {/* Full Statutory Legal Email Modal */}
       {draftModalIssue && (
         <div className="fixed inset-0 z-50 bg-[#121316]/80 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-[#121316] hard-shadow max-w-xl w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border-2 border-[#121316] hard-shadow max-w-2xl w-full p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b-2 border-[#121316] pb-3">
-              <h3 className="font-display text-lg font-bold text-[#121316]">
-                Legal Notice — #{draftModalIssue.reference_id}
-              </h3>
+              <div>
+                <span className="font-mono text-[10px] font-bold uppercase text-[#D94E28]">
+                  // STATUTORY ESCALATION DISPATCH
+                </span>
+                <h3 className="font-display text-lg font-bold text-[#121316]">
+                  Official Legal Notice — Docket #{draftModalIssue.reference_id}
+                </h3>
+              </div>
               <button
                 onClick={() => setDraftModalIssue(null)}
                 className="font-mono text-xs font-bold bg-[#121316] text-white px-2.5 py-1 cursor-pointer"
               >
-                ✕
+                ✕ CLOSE
               </button>
             </div>
 
             <div className="space-y-3 font-mono text-xs">
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">To:</label>
+                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">To Nodal Email:</label>
                 <input
                   type="text"
                   value={draftTo}
@@ -360,9 +383,11 @@ ${user?.email || ''}`;
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">Notice:</label>
+                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">
+                  Statutory Notice Body (Includes PostGIS Telemetry &amp; AI Evidence):
+                </label>
                 <textarea
-                  rows={8}
+                  rows={12}
                   value={draftBody}
                   onChange={(e) => setDraftBody(e.target.value)}
                   className="w-full p-3 bg-[#F5F3EE] border border-[#121316] leading-relaxed"

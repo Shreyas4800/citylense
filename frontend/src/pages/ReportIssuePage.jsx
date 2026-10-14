@@ -9,10 +9,10 @@ const API_BASE =
     : 'https://citylense.onrender.com');
 
 const PRESET_COORDS = [
-  { label: 'Ichalkaranji', lat: '16.6966', lng: '74.4593' },
-  { label: 'Kolhapur', lat: '16.7050', lng: '74.2433' },
-  { label: 'Pune', lat: '18.5204', lng: '73.8567' },
-  { label: 'Mumbai', lat: '18.9388', lng: '72.8354' }
+  { label: 'Ichalkaranji (IMC)', lat: '16.6966', lng: '74.4593' },
+  { label: 'Kolhapur (KMC)', lat: '16.7050', lng: '74.2433' },
+  { label: 'Pune (PMC)', lat: '18.5204', lng: '73.8567' },
+  { label: 'Mumbai (BMC)', lat: '18.9388', lng: '72.8354' }
 ];
 
 export default function ReportIssuePage({ onReportCreated, user }) {
@@ -42,14 +42,14 @@ export default function ReportIssuePage({ onReportCreated, user }) {
   const issueTypes = [
     {
       id: 'infrastructure',
-      label: 'Infrastructure Issue',
-      description: 'Potholes, damaged roads, water leaks, drainage',
+      label: 'Infrastructure Defect',
+      description: 'Carriageway potholes, damaged roads, water pipeline leaks, storm drainage',
       categories: ['Roads & Infra', 'Water & Drainage', 'Encroachment & Estate']
     },
     {
       id: 'service',
       label: 'Municipal Service Issue',
-      description: 'Street lights, garbage collection, public sanitation, gardens',
+      description: 'Street light outages, garbage overflow, public sanitation, gardens',
       categories: ['Health & SWM', 'Electricity', 'Environment & Gardens']
     }
   ];
@@ -57,35 +57,52 @@ export default function ReportIssuePage({ onReportCreated, user }) {
   const selectedTypeObj = issueTypes.find((t) => t.id === issueType);
 
   const buildLegalEmailDraft = (apiData) => {
-    const citizenName = user?.name || 'Citizen Reporter';
+    const citizenName = user?.name || 'Registered Citizen Reporter';
+    const citizenEmail = user?.email || 'Verified Field Submission';
     const lat = parseFloat(formData.latitude).toFixed(6);
     const lng = parseFloat(formData.longitude).toFixed(6);
     const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+    const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-    const subject = `[Docket #${apiData.reference_id}] ${apiData.ai_classification.category} Defect — ${apiData.jurisdiction}`;
+    const subject = `[OFFICIAL CIVIC DOCKET #${apiData.reference_id}] Urgent ${apiData.ai_classification.category} Defect Notice — ${apiData.jurisdiction}`;
 
     const body = `To,
-The Nodal Officer (${apiData.ai_classification.category}),
-${apiData.jurisdiction} Municipal Corporation.
+The Nodal Officer / Executive Engineer (${apiData.ai_classification.category} Wing),
+${apiData.jurisdiction} Municipal Corporation,
+Maharashtra State.
 
-Subject: Official Civic Defect Notice [Ref: ${apiData.reference_id}]
+SUBJECT: Statutory Civic Defect Notice & Request for Time-Bound Rectification [Docket Ref: ${apiData.reference_id}]
 
 Respected Sir / Madam,
 
-I am reporting a verified civic defect within ${apiData.jurisdiction}:
+I am writing to formally place on record a verified civic infrastructure defect within the municipal limits of ${apiData.jurisdiction}, authenticated via the CityLense E-Governance & Spatial Triage Gateway.
 
-- Docket ID   : ${apiData.reference_id}
-- Issue       : ${formData.title}
-- AI Summary  : ${apiData.ai_classification.summary}
-- Coordinates : ${lat}° N, ${lng}° E
-- Google Maps : ${mapsUrl}
-- Evidence    : ${apiData.image_url || 'Attached'}
+1. DOCKET & SPATIAL TELEMETRY
+--------------------------------------------------
+- Reference Docket ID : ${apiData.reference_id}
+- Reported Title      : ${formData.title}
+- Location / Landmark : ${formData.locationName || apiData.jurisdiction}
+- PostGIS Coordinates : ${lat}° N, ${lng}° E (WGS 84)
+- Google Maps Pin     : ${mapsUrl}
+- Timestamp (IST)     : ${timestamp}
 
-Please acknowledge receipt and initiate necessary rectification.
+2. AI COMPUTER VISION TECHNICAL ASSESSMENT
+--------------------------------------------------
+- Assigned Department : ${apiData.ai_classification.category}
+- AI Confidence Score : ${Math.round((apiData.ai_classification.confidence || 0.95) * 100)}%
+- Technical Summary   : ${apiData.ai_classification.summary}
+- Citizen Field Notes : ${formData.description}
+- Cloud Evidence URL  : ${apiData.image_url || 'Attached in Municipal Cloud Registry'}
+
+3. STATUTORY REQUEST FOR ACTION
+--------------------------------------------------
+Pursuant to obligatory municipal duties under the Maharashtra Municipal Corporations Act regarding public safety and civic maintenance, this defect poses an active hazard to commuters and residents.
+
+Please acknowledge receipt of Docket #${apiData.reference_id} and initiate field inspection and remedial work at the earliest.
 
 Sincerely,
 ${citizenName}
-${user?.email || ''}`;
+${citizenEmail}`;
 
     setEmailRecipient(apiData.department_email || 'nodal@maharashtra.gov.in');
     setEmailSubject(subject);
@@ -123,18 +140,18 @@ ${user?.email || ''}`;
             ...prev,
             latitude: lat,
             longitude: lng,
-            locationName: prev.locationName || `GPS (${lat}, ${lng})`
+            locationName: prev.locationName || `Device GPS (${lat}, ${lng})`
           }));
           setLocating(false);
         },
         () => {
-          setError('GPS blocked. Select a preset city below or allow location access.');
+          setError('GPS permission blocked. Select a preset city below or type coordinates.');
           setLocating(false);
         },
         { enableHighAccuracy: true }
       );
     } else {
-      setError('Geolocation not supported.');
+      setError('Geolocation not supported by browser.');
       setLocating(false);
     }
   };
@@ -152,11 +169,11 @@ ${user?.email || ''}`;
   const handleStep2Continue = (e) => {
     e.preventDefault();
     if (!formData.image) {
-      setError('Please attach a photo.');
+      setError('Please attach a field photograph.');
       return;
     }
     if (!formData.latitude || !formData.longitude) {
-      setError('Please lock GPS or select a city.');
+      setError('Please fetch GPS coordinates or select a city preset.');
       return;
     }
     setError(null);
@@ -217,14 +234,14 @@ ${user?.email || ''}`;
     <div className="min-h-screen bg-[#F5F3EE] py-6 pb-24 md:pb-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         
-        {/* Compact Step Bar */}
+        {/* Step Progress Bar */}
         <div className="mb-6 bg-white border-2 border-[#121316] p-2.5 hard-shadow-sm">
           <div className="grid grid-cols-4 gap-1.5 font-mono text-[11px] uppercase font-bold">
             {[
               { s: 1, label: '1. Type' },
               { s: 2, label: '2. Details' },
               { s: 3, label: '3. Review' },
-              { s: 4, label: '4. Done' }
+              { s: 4, label: '4. Dispatch' }
             ].map((item) => (
               <div
                 key={item.s}
@@ -244,15 +261,15 @@ ${user?.email || ''}`;
 
         {error && (
           <div className="mb-5 bg-[#FFE8E0] border-2 border-[#D94E28] text-[#121316] p-3.5 font-mono text-xs font-bold">
-            {error}
+            [ALERT] // {error}
           </div>
         )}
 
-        {/* STEP 1 */}
+        {/* STEP 1: SELECT TYPE */}
         {step === 1 && (
           <div className="bg-white border-2 border-[#121316] p-5 sm:p-7 space-y-5 hard-shadow">
             <h1 className="font-display text-xl sm:text-2xl font-bold text-[#121316]">
-              What type of issue are you reporting?
+              Select Defect Category
             </h1>
 
             <div className="space-y-3">
@@ -275,11 +292,11 @@ ${user?.email || ''}`;
           </div>
         )}
 
-        {/* STEP 2 */}
+        {/* STEP 2: DETAILS, VISIBLE COORDINATES & PHOTO */}
         {step === 2 && (
           <form onSubmit={handleStep2Continue} className="bg-white border-2 border-[#121316] p-5 sm:p-7 space-y-5 hard-shadow">
             <div className="flex items-center justify-between border-b-2 border-[#121316] pb-3">
-              <h1 className="font-display text-xl font-bold text-[#121316]">Issue Details</h1>
+              <h1 className="font-display text-xl font-bold text-[#121316]">Issue Details &amp; Telemetry</h1>
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -290,7 +307,7 @@ ${user?.email || ''}`;
             </div>
 
             <div>
-              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-2">Category</label>
+              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-2">Department Wing</label>
               <div className="flex flex-wrap gap-2">
                 {selectedTypeObj?.categories.map((cat) => (
                   <button
@@ -310,11 +327,11 @@ ${user?.email || ''}`;
             </div>
 
             <div>
-              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-1">Title</label>
+              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-1">Issue Title</label>
               <input
                 type="text"
                 required
-                placeholder="Brief title of the defect"
+                placeholder="e.g., Deep pothole cluster on Station Road"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3 py-2.5 text-sm bg-[#F5F3EE] border-2 border-[#121316] focus:bg-white focus:outline-none"
@@ -322,64 +339,109 @@ ${user?.email || ''}`;
             </div>
 
             <div>
-              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-1">Description</label>
+              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-1">Field Notes / Landmarks</label>
               <textarea
                 rows={2}
                 required
-                placeholder="Landmarks or severity details..."
+                placeholder="Describe severity, traffic hazard, or nearby landmarks..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="w-full px-3 py-2 text-sm bg-[#F5F3EE] border-2 border-[#121316] focus:bg-white focus:outline-none"
               />
             </div>
 
-            {/* Compact GPS Box */}
-            <div className="bg-[#F5F3EE] border-2 border-[#121316] p-3.5 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-xs font-bold uppercase">Location GPS</span>
+            {/* GPS Coordinates Box with Visible Lat/Lng Inputs */}
+            <div className="bg-[#F5F3EE] border-2 border-[#121316] p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="font-mono text-xs font-bold uppercase text-[#121316]">
+                  GPS Coordinates (PostGIS)
+                </label>
                 <button
                   type="button"
                   onClick={acquireGps}
                   disabled={locating}
-                  className="bg-[#121316] hover:bg-[#D94E28] text-white font-mono text-xs font-bold px-3 py-1.5 cursor-pointer"
+                  className="bg-[#121316] hover:bg-[#D94E28] text-white font-mono text-xs font-bold px-3.5 py-2 transition-colors cursor-pointer"
                 >
-                  {locating ? 'Locating...' : formData.latitude ? 'GPS Locked ✓' : '⊕ Use My GPS'}
+                  {locating ? 'Acquiring GPS...' : '⊕ Fetch Device GPS'}
                 </button>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                {PRESET_COORDS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => applyPreset(p)}
-                    className={`font-mono text-[11px] px-2.5 py-1 border border-[#121316] cursor-pointer ${
-                      formData.locationName === p.label ? 'bg-[#D94E28] text-white font-bold' : 'bg-white text-[#121316]'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+              {/* Visible Latitude & Longitude Boxes */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <span className="block font-mono text-[10px] uppercase text-[#4A4D55] mb-1">Latitude (°N)</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="16.6966"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                    className="w-full px-3 py-2 font-mono text-xs font-bold bg-white border-2 border-[#121316] text-[#121316]"
+                  />
+                </div>
+                <div>
+                  <span className="block font-mono text-[10px] uppercase text-[#4A4D55] mb-1">Longitude (°E)</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="74.4593"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                    className="w-full px-3 py-2 font-mono text-xs font-bold bg-white border-2 border-[#121316] text-[#121316]"
+                  />
+                </div>
+              </div>
+
+              {formData.latitude && formData.longitude && (
+                <div className="bg-[#D8F3DC] border border-[#1B4332] px-3 py-1.5 font-mono text-xs font-bold text-[#1B4332] flex items-center justify-between">
+                  <span>LOCKED: {formData.latitude}° N, {formData.longitude}° E</span>
+                  <span>✓</span>
+                </div>
+              )}
+
+              <div>
+                <span className="font-mono text-[10px] uppercase text-[#4A4D55] block mb-1.5">
+                  Quick-Select Municipality Node:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRESET_COORDS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => applyPreset(p)}
+                      className={`font-mono text-[11px] px-2.5 py-1 border border-[#121316] cursor-pointer ${
+                        formData.latitude === p.lat ? 'bg-[#D94E28] text-white font-bold' : 'bg-white text-[#121316]'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Photo Upload */}
             <div>
-              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-1">Photo Evidence</label>
+              <label className="block font-mono text-xs font-bold uppercase text-[#121316] mb-1.5">
+                Photographic Evidence
+              </label>
               {formData.imagePreview ? (
-                <div className="relative border-2 border-[#121316]">
-                  <img src={formData.imagePreview} alt="Preview" className="w-full h-48 object-cover" />
+                <div className="relative border-2 border-[#121316] bg-[#121316]">
+                  <img src={formData.imagePreview} alt="Preview" className="w-full h-52 object-cover" />
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, image: null, imagePreview: null })}
-                    className="absolute top-2 right-2 bg-[#D94E28] text-white font-mono text-xs font-bold px-2.5 py-1 border border-[#121316] cursor-pointer"
+                    className="absolute top-2.5 right-2.5 bg-[#D94E28] text-white font-mono text-xs font-bold px-3 py-1 border border-[#121316] cursor-pointer"
                   >
-                    Change
+                    Replace Photo
                   </button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-[#121316] bg-[#F5F3EE] hover:bg-white cursor-pointer">
-                  <span className="font-mono text-xs font-bold uppercase text-[#121316]">+ Tap to Take / Upload Photo</span>
+                <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-[#121316] bg-[#F5F3EE] hover:bg-white cursor-pointer">
+                  <span className="font-mono text-xs font-bold uppercase text-[#121316]">
+                    [ + Capture or Upload Field Photo ]
+                  </span>
+                  <span className="font-mono text-[11px] text-[#4A4D55] mt-1">JPG / PNG up to 10MB</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -395,16 +457,16 @@ ${user?.email || ''}`;
               type="submit"
               className="w-full bg-[#D94E28] hover:bg-[#b83d1b] text-white font-mono text-xs uppercase font-bold py-3.5 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
             >
-              Review Report &rarr;
+              Review Submission &rarr;
             </button>
           </form>
         )}
 
-        {/* STEP 3 */}
+        {/* STEP 3: REVIEW PAYLOAD */}
         {step === 3 && (
           <div className="bg-white border-2 border-[#121316] p-5 sm:p-7 space-y-5 hard-shadow">
             <div className="flex items-center justify-between border-b-2 border-[#121316] pb-3">
-              <h1 className="font-display text-xl font-bold text-[#121316]">Review &amp; Submit</h1>
+              <h1 className="font-display text-xl font-bold text-[#121316]">Review Submission Payload</h1>
               <button
                 type="button"
                 onClick={() => setStep(2)}
@@ -417,80 +479,141 @@ ${user?.email || ''}`;
 
             <div className="divide-y divide-[#D8D4C8] font-mono text-xs">
               <div className="py-2.5 flex justify-between">
-                <span className="text-[#4A4D55]">Category</span>
-                <span className="font-bold">{formData.category}</span>
+                <span className="text-[#4A4D55]">Target Wing</span>
+                <span className="font-bold text-[#121316]">{formData.category}</span>
               </div>
               <div className="py-2.5 flex justify-between">
-                <span className="text-[#4A4D55]">Title</span>
-                <span className="font-bold">{formData.title}</span>
+                <span className="text-[#4A4D55]">Docket Title</span>
+                <span className="font-bold text-[#121316]">{formData.title}</span>
               </div>
               <div className="py-2.5 flex justify-between">
-                <span className="text-[#4A4D55]">Coordinates</span>
-                <span className="font-bold text-[#D94E28]">{formData.latitude}, {formData.longitude}</span>
+                <span className="text-[#4A4D55]">GPS Coordinates</span>
+                <span className="font-bold text-[#D94E28]">{formData.latitude}° N, {formData.longitude}° E</span>
+              </div>
+              <div className="py-2.5">
+                <span className="text-[#4A4D55] block mb-1">Field Notes</span>
+                <p className="text-[#121316] font-sans text-sm">{formData.description}</p>
               </div>
               <div className="py-3">
-                <img src={formData.imagePreview} alt="Review" className="w-full h-44 object-cover border-2 border-[#121316]" />
+                <span className="text-[#4A4D55] block mb-2">Attached Evidence</span>
+                <img src={formData.imagePreview} alt="Review" className="w-full h-48 object-cover border-2 border-[#121316]" />
               </div>
             </div>
 
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="w-full bg-[#121316] hover:bg-[#D94E28] disabled:opacity-60 text-white font-mono text-xs uppercase font-bold py-3.5 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
+              className="w-full bg-[#121316] hover:bg-[#D94E28] disabled:opacity-60 text-white font-mono text-xs uppercase font-bold py-4 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
             >
-              {isSubmitting ? 'Verifying with AI...' : 'Submit Report'}
+              {isSubmitting ? 'Running AI Vision & PostGIS Routing...' : 'Submit & Verify with AI'}
             </button>
           </div>
         )}
 
-        {/* STEP 4 */}
+        {/* STEP 4: FULL RECEIPT + AI ASSESSMENT + STATUTORY EMAIL DRAFT */}
         {step === 4 && receipt && (
-          <div className="bg-white border-2 border-[#121316] p-5 sm:p-7 space-y-5 hard-shadow">
-            <div className="border-b-2 border-[#121316] pb-3 flex items-center justify-between">
+          <div className="bg-white border-2 border-[#121316] p-5 sm:p-7 space-y-6 hard-shadow">
+            <div className="border-b-2 border-[#121316] pb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="font-mono text-[11px] font-bold text-[#1B4332]">✓ VERIFIED</span>
-                <h1 className="font-display text-xl font-bold text-[#121316]">Report Logged</h1>
+                <span className="font-mono text-xs font-bold bg-[#D8F3DC] text-[#1B4332] border border-[#1B4332] px-2.5 py-0.5">
+                  STATUS // AI VERIFIED &amp; ROUTED
+                </span>
+                <h1 className="font-display text-2xl font-bold text-[#121316] mt-2">
+                  Municipal Routing Receipt
+                </h1>
               </div>
-              <span className="font-mono text-sm font-bold bg-[#121316] text-white px-2.5 py-1">
+              <span className="font-mono text-base font-bold bg-[#121316] text-white px-3 py-1">
                 {receipt.reference_id}
               </span>
             </div>
 
-            <div className="bg-[#F5F3EE] border-2 border-[#121316] p-3.5 space-y-2 font-mono text-xs">
+            {/* Routing & Telemetry Summary */}
+            <div className="bg-[#F5F3EE] border-2 border-[#121316] p-4 space-y-2 font-mono text-xs">
               <div className="flex justify-between">
-                <span className="text-[#4A4D55]">Municipality</span>
-                <span className="font-bold">{receipt.jurisdiction}</span>
+                <span className="text-[#4A4D55]">Matched Corporation</span>
+                <span className="font-bold text-[#121316]">{receipt.jurisdiction}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#4A4D55]">Department</span>
-                <span className="font-bold">{receipt.ai_classification.category}</span>
+                <span className="text-[#4A4D55]">AI Classification</span>
+                <span className="font-bold text-[#121316]">
+                  {receipt.ai_classification.category} ({Math.round((receipt.ai_classification.confidence || 0.95) * 100)}% Confidence)
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#4A4D55]">Nodal Email</span>
-                <span className="font-bold text-[#D94E28] truncate ml-2">{receipt.department_email}</span>
+                <span className="text-[#4A4D55]">GPS Coordinates</span>
+                <span className="font-bold text-[#121316]">
+                  {Number(formData.latitude).toFixed(5)}° N, {Number(formData.longitude).toFixed(5)}° E
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#4A4D55]">Routed Nodal Email</span>
+                <span className="font-bold text-[#D94E28] break-all ml-2">{receipt.department_email}</span>
               </div>
             </div>
 
-            {/* Clean Legal Email Composer */}
-            <div className="border-2 border-[#121316] bg-[#F5F3EE] p-4 space-y-3 font-mono text-xs">
-              <div className="font-display text-sm font-bold text-[#121316]">
-                Official Complaint Email Draft
+            {/* Dedicated AI Vision Technical Summary Box */}
+            <div className="border-l-4 border-[#121316] bg-[#F5F3EE] p-4">
+              <div className="font-mono text-[10px] font-bold uppercase text-[#D94E28] mb-1">
+                AI Computer Vision Technical Assessment
+              </div>
+              <p className="text-sm text-[#121316] leading-relaxed">
+                {receipt.ai_classification.summary}
+              </p>
+            </div>
+
+            {/* Full Statutory Legal Email Draft Composer */}
+            <div className="border-2 border-[#121316] bg-[#F5F3EE] p-4 sm:p-5 space-y-3.5 font-mono text-xs">
+              <div className="flex items-center justify-between border-b-2 border-[#121316] pb-2.5">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-[#D94E28] block">
+                    // AUTOMATED STATUTORY NOTICE
+                  </span>
+                  <h2 className="font-display text-base font-bold text-[#121316]">
+                    Official Legal Complaint Email Draft
+                  </h2>
+                </div>
+                <span className="text-[10px] bg-white border border-[#121316] px-2 py-0.5 font-bold">
+                  EDITABLE
+                </span>
               </div>
 
-              <input
-                type="text"
-                value={emailRecipient}
-                onChange={(e) => setEmailRecipient(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#121316] font-bold text-[#D94E28]"
-              />
-              <textarea
-                rows={7}
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                className="w-full p-2.5 bg-white border border-[#121316] leading-relaxed"
-              />
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">
+                  To (Department Nodal Officer):
+                </label>
+                <input
+                  type="text"
+                  value={emailRecipient}
+                  onChange={(e) => setEmailRecipient(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-[#121316] font-bold text-[#D94E28]"
+                />
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">
+                  Official Docket Subject Line:
+                </label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-[#121316] font-bold text-[#121316]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">
+                  Statutory Notice Body (Includes PostGIS Telemetry &amp; AI Evidence):
+                </label>
+                <textarea
+                  rows={12}
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  className="w-full p-3 bg-white border border-[#121316] text-[#121316] leading-relaxed focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -499,9 +622,9 @@ ${user?.email || ''}`;
                     )}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
                     window.open(gmailUrl, '_blank', 'noopener,noreferrer');
                   }}
-                  className="bg-[#D94E28] text-white font-bold py-2.5 px-3 border-2 border-[#121316] cursor-pointer"
+                  className="bg-[#D94E28] hover:bg-[#b83d1b] text-white font-bold py-3 px-3 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
                 >
-                  Open Gmail
+                  1. Open in Gmail &rarr;
                 </button>
                 <button
                   type="button"
@@ -510,39 +633,49 @@ ${user?.email || ''}`;
                       emailSubject
                     )}&body=${encodeURIComponent(emailBody)}`;
                   }}
-                  className="bg-[#121316] text-white font-bold py-2.5 px-3 border-2 border-[#121316] cursor-pointer"
+                  className="bg-[#121316] text-white font-bold py-3 px-3 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
                 >
-                  Mail App
+                  2. Open Mail App
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(emailBody);
+                    navigator.clipboard.writeText(`To: ${emailRecipient}\nSubject: ${emailSubject}\n\n${emailBody}`);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className="bg-white text-[#121316] font-bold py-2.5 px-3 border-2 border-[#121316] cursor-pointer"
+                  className="bg-white text-[#121316] font-bold py-3 px-3 border-2 border-[#121316] cursor-pointer"
                 >
-                  {copied ? 'Copied ✓' : 'Copy Text'}
+                  {copied ? 'Copied ✓' : '3. Copy Notice'}
                 </button>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-1">
               <button
                 onClick={() => navigate('/feed')}
                 className="flex-1 bg-[#121316] text-white font-mono text-xs uppercase font-bold py-3 border-2 border-[#121316] cursor-pointer"
               >
-                Public Feed
+                View in Public Feed
               </button>
               <button
                 onClick={() => {
                   setStep(1);
                   setReceipt(null);
+                  setFormData({
+                    category: '',
+                    title: '',
+                    description: '',
+                    locationName: '',
+                    latitude: '',
+                    longitude: '',
+                    image: null,
+                    imagePreview: null
+                  });
                 }}
                 className="flex-1 bg-white text-[#121316] font-mono text-xs uppercase font-bold py-3 border-2 border-[#121316] cursor-pointer"
               >
-                New Report
+                Submit Another
               </button>
             </div>
           </div>
