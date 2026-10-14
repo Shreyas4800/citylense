@@ -17,11 +17,9 @@ export default function PublicFeedPage({ issues = [], loading, onUpvote, onRefre
     'Water & Drainage',
     'Health & SWM',
     'Electricity',
-    'Environment & Gardens',
-    'Encroachment & Estate'
+    'Environment & Gardens'
   ];
 
-  // Dynamic filtered issues
   const filteredIssues = issues.filter((issue) => {
     const matchesCity =
       selectedMunicipality === 'All Jurisdictions' ||
@@ -32,30 +30,19 @@ export default function PublicFeedPage({ issues = [], loading, onUpvote, onRefre
     return matchesCity && matchesCat;
   });
 
-  // Dynamic Analytics Calculations from real DB issues
   const totalCount = issues.length;
   const resolvedCount = issues.filter((i) => i.status === 'resolved').length;
   const inProgressCount = issues.filter((i) => i.status === 'in-progress').length;
   const verifiedOpenCount = totalCount - resolvedCount - inProgressCount;
-  const avgConfidence =
-    totalCount > 0
-      ? Math.round(
-          (issues.reduce((acc, i) => acc + (Number(i.confidence) || 0.92), 0) / totalCount) * 100
-        )
-      : 0;
 
-  // Dynamic Municipality Breakdown
   const cityCountsMap = {};
   issues.forEach((i) => {
     const c = i.jurisdiction || 'Kolhapur (KMC)';
-    if (!cityCountsMap[c]) cityCountsMap[c] = { city: c, total: 0, resolved: 0, pending: 0 };
+    if (!cityCountsMap[c]) cityCountsMap[c] = { city: c, total: 0 };
     cityCountsMap[c].total += 1;
-    if (i.status === 'resolved') cityCountsMap[c].resolved += 1;
-    else cityCountsMap[c].pending += 1;
   });
   const municipalityBreakdown = Object.values(cityCountsMap).sort((a, b) => b.total - a.total);
 
-  // Dynamic Category Wing Breakdown
   const categoryCountsMap = {};
   issues.forEach((i) => {
     const cat = i.category || 'Roads & Infra';
@@ -69,30 +56,29 @@ export default function PublicFeedPage({ issues = [], loading, onUpvote, onRefre
     const lng = Number(issue.longitude).toFixed(6);
     const targetEmail = issue.department_email || 'nodal@maharashtra.gov.in';
 
-    const subject = `[OFFICIAL CIVIC DOCKET #${issue.reference_id}] Escalation Notice: ${issue.category} (${issue.jurisdiction})`;
+    const subject = `[Docket #${issue.reference_id}] ${issue.category} Issue — ${issue.jurisdiction}`;
     const body = `To,
-The Nodal Officer (${issue.category} Wing),
+The Nodal Officer (${issue.category}),
 ${issue.jurisdiction} Municipal Corporation.
 
-SUBJECT: Citizen Escalation for Verified Docket #${issue.reference_id}
+Subject: Urgent Action Requested for Verified Docket #${issue.reference_id}
 
 Respected Sir / Madam,
 
-Please find below the verified telemetry and AI inspection summary for an active civic defect in ${issue.jurisdiction}:
+Please find the details of a verified civic defect in ${issue.jurisdiction}:
 
-- Docket Reference : ${issue.reference_id}
-- Category         : ${issue.category} (AI Confidence: ${Math.round((issue.confidence || 0.95) * 100)}%)
-- Summary          : ${issue.ai_summary || issue.description}
-- Coordinates      : ${lat}° N, ${lng}° E
-- Google Maps Pin  : https://www.google.com/maps?q=${lat},${lng}
-- Logged Timestamp : ${issue.date}
-- Evidence Image   : ${issue.image_url}
+- Reference ID : ${issue.reference_id}
+- Category     : ${issue.category}
+- Assessment   : ${issue.ai_summary || issue.description}
+- Coordinates  : ${lat}° N, ${lng}° E
+- Google Maps  : https://www.google.com/maps?q=${lat},${lng}
+- Photo URL    : ${issue.image_url}
 
-We request immediate departmental inspection and resolution.
+Kindly initiate field inspection and resolution.
 
 Sincerely,
-${user?.name || 'Concerned Citizen'}
-${user?.email || 'Dispatched via CityLense Public Registry'}`;
+${user?.name || 'Citizen Reporter'}
+${user?.email || ''}`;
 
     setDraftTo(targetEmail);
     setDraftSubject(subject);
@@ -101,52 +87,47 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F3EE] py-8 pb-24 md:pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="min-h-screen bg-[#F5F3EE] py-6 pb-24 md:pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
         
-        {/* Header */}
-        <div className="bg-white border-2 border-[#121316] p-6 hard-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <span className="font-mono text-xs font-bold uppercase tracking-widest text-[#D94E28]">
-              // LIVE POSTGRESQL &amp; AZURE BLOB REGISTRY ({issues.length} DOCKETS)
-            </span>
-            <h1 className="font-display text-3xl font-bold text-[#121316] mt-1">
-              Municipal Inspection Dockets
-            </h1>
-          </div>
+        {/* Compact Header */}
+        <div className="bg-white border-2 border-[#121316] p-4 sm:p-5 hard-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h1 className="font-display text-2xl font-bold text-[#121316]">
+            Public Feed ({filteredIssues.length})
+          </h1>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="bg-[#121316] hover:bg-[#D94E28] text-white font-mono text-xs uppercase font-bold px-3.5 py-2.5 border-2 border-[#121316] cursor-pointer"
-            >
-              ↻ Sync Live DB
-            </button>
+          <div className="flex items-center gap-2">
             <select
               value={selectedMunicipality}
               onChange={(e) => setSelectedMunicipality(e.target.value)}
-              className="bg-[#F5F3EE] border-2 border-[#121316] text-[#121316] font-mono text-xs px-3 py-2.5 font-semibold focus:outline-none"
+              className="flex-1 sm:flex-initial bg-[#F5F3EE] border-2 border-[#121316] text-[#121316] font-mono text-xs px-3 py-2 font-semibold focus:outline-none"
             >
               {MUNICIPALITIES.map((mun) => (
                 <option key={mun} value={mun}>{mun}</option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="bg-[#121316] hover:bg-[#D94E28] text-white font-mono text-xs uppercase font-bold px-3 py-2 border-2 border-[#121316] cursor-pointer"
+            >
+              ↻ Sync
+            </button>
           </div>
         </div>
 
-        {/* 4 Tabs */}
-        <div className="flex flex-wrap border-2 border-[#121316] bg-white">
+        {/* Clean 4-Tab Bar */}
+        <div className="grid grid-cols-4 border-2 border-[#121316] bg-white">
           {[
-            { id: 'feed', label: `01 // Live Feed (${filteredIssues.length})` },
-            { id: 'map', label: `02 // GIS Map (${filteredIssues.length})` },
-            { id: 'analytics', label: '03 // Live Analytics' },
-            { id: 'history', label: `04 // Audit History (${issues.length})` }
+            { id: 'feed', label: 'Feed' },
+            { id: 'map', label: 'Map' },
+            { id: 'analytics', label: 'Analytics' },
+            { id: 'history', label: 'History' }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 min-w-[150px] py-3.5 px-4 font-mono text-xs uppercase tracking-wider font-bold border-r border-[#121316] last:border-r-0 transition-colors cursor-pointer ${
+              className={`py-3 px-2 font-mono text-xs uppercase font-bold border-r border-[#121316] last:border-r-0 transition-colors cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-[#121316] text-white'
                   : 'bg-white text-[#121316] hover:bg-[#F5F3EE]'
@@ -157,201 +138,125 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
           ))}
         </div>
 
-        {/* TAB 1: LIVE FEED */}
+        {/* TAB 1: FEED */}
         {activeTab === 'feed' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 space-y-4">
-              <div className="bg-white p-4 border-2 border-[#121316] flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs font-bold uppercase text-[#4A4D55] mr-2">Wing:</span>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 font-mono text-xs uppercase transition-colors border cursor-pointer ${
-                      selectedCategory === cat
-                        ? 'bg-[#D94E28] text-white border-[#121316] font-bold'
-                        : 'bg-[#F5F3EE] text-[#121316] border-[#D8D4C8] hover:border-[#121316]'
-                    }`}
-                  >
-                    {cat === 'all' ? 'All Wings' : cat}
-                  </button>
-                ))}
-              </div>
+          <div className="space-y-4">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1.5 font-mono text-xs uppercase shrink-0 border cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-[#D94E28] text-white border-[#121316] font-bold'
+                      : 'bg-white text-[#121316] border-[#121316]'
+                  }`}
+                >
+                  {cat === 'all' ? 'All' : cat}
+                </button>
+              ))}
+            </div>
 
-              {loading ? (
-                <div className="bg-white border-2 border-[#121316] p-12 text-center font-mono text-sm text-[#121316]">
-                  SYNCING LIVE REPORTS FROM AZURE POSTGRESQL...
-                </div>
-              ) : filteredIssues.length === 0 ? (
-                <div className="bg-white border-2 border-[#121316] p-12 text-center font-mono text-sm text-[#4A4D55]">
-                  NO DOCKETS FOUND FOR THIS FILTER. SUBMIT A REPORT TO POPULATE THE LEDGER.
-                </div>
-              ) : (
-                filteredIssues.map((issue) => (
+            {loading ? (
+              <div className="bg-white border-2 border-[#121316] p-10 text-center font-mono text-xs">
+                Loading reports...
+              </div>
+            ) : filteredIssues.length === 0 ? (
+              <div className="bg-white border-2 border-[#121316] p-10 text-center font-mono text-xs text-[#4A4D55]">
+                No reports match this filter.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {filteredIssues.map((issue) => (
                   <div
                     key={issue.id || issue.reference_id}
-                    className="bg-white border-2 border-[#121316] hard-shadow flex flex-col sm:flex-row overflow-hidden"
+                    className="bg-white border-2 border-[#121316] hard-shadow flex flex-col justify-between overflow-hidden"
                   >
-                    <div className="w-full sm:w-60 h-52 sm:h-auto bg-[#E5E2D9] shrink-0 border-b-2 sm:border-b-0 sm:border-r-2 border-[#121316] relative">
-                      <img
-                        src={issue.image_url}
-                        alt={issue.category}
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute top-2 left-2 bg-[#121316] text-white font-mono text-[10px] font-bold px-2 py-0.5">
-                        {issue.reference_id}
-                      </span>
-                      <span className="absolute bottom-2 left-2 bg-[#121316]/90 text-white font-mono text-[10px] px-2 py-0.5">
-                        {(issue.status || 'verified').toUpperCase()}
-                      </span>
-                    </div>
+                    <div>
+                      <div className="h-48 bg-[#E5E2D9] border-b-2 border-[#121316] relative">
+                        <img
+                          src={issue.image_url}
+                          alt={issue.category}
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute top-2 left-2 bg-[#121316] text-white font-mono text-[10px] font-bold px-2 py-0.5">
+                          {issue.reference_id}
+                        </span>
+                        <span className="absolute top-2 right-2 bg-white text-[#121316] border border-[#121316] font-mono text-[10px] font-bold px-2 py-0.5">
+                          {issue.category}
+                        </span>
+                      </div>
 
-                    <div className="flex-1 p-5 flex flex-col justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-[11px] font-bold uppercase bg-[#F5F3EE] border border-[#121316] px-2 py-0.5">
-                              {issue.category}
-                            </span>
-                            <span className="font-mono text-[11px] font-bold text-[#1B4332] bg-[#D8F3DC] border border-[#1B4332] px-2 py-0.5">
-                              AI CONF: {Math.round((issue.confidence || 0.95) * 100)}%
-                            </span>
-                          </div>
-                          <span className="font-mono text-[11px] text-[#4A4D55]">{issue.date}</span>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between font-mono text-xs mb-1.5">
+                          <span className="font-bold text-[#D94E28]">{issue.jurisdiction}</span>
+                          <span className="text-[#4A4D55] text-[11px]">{issue.date}</span>
                         </div>
-
-                        <h3 className="font-display text-lg font-bold text-[#121316] mb-1.5">
-                          {issue.title || `${issue.category} — ${issue.jurisdiction}`}
-                        </h3>
-                        <p className="text-sm text-[#4A4D55] leading-relaxed">
+                        <p className="text-sm text-[#121316] leading-relaxed line-clamp-3">
                           {issue.ai_summary || issue.description}
                         </p>
                       </div>
+                    </div>
 
-                      <div className="mt-4 pt-3 border-t border-[#D8D4C8] flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
-                        <div>
-                          <span className="font-bold text-[#121316]">{issue.jurisdiction}</span>
-                          <span className="mx-2 text-[#D8D4C8]">|</span>
-                          <span className="text-[#4A4D55]">
-                            {Number(issue.latitude).toFixed(4)}°N, {Number(issue.longitude).toFixed(4)}°E
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEmailModal(issue)}
-                            className="bg-[#D94E28] hover:bg-[#b83d1b] text-white border border-[#121316] px-3 py-1 font-mono text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            ✉ DRAFT LEGAL EMAIL
-                          </button>
-                          <button
-                            onClick={() => onUpvote(issue.reference_id)}
-                            className="bg-[#F5F3EE] hover:bg-[#121316] hover:text-white text-[#121316] border border-[#121316] px-3 py-1 font-mono text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            ▲ [{issue.upvotes || 1}]
-                          </button>
-                        </div>
-                      </div>
+                    <div className="px-4 py-3 bg-[#F5F3EE] border-t-2 border-[#121316] flex items-center justify-between gap-2 font-mono text-xs">
+                      <button
+                        onClick={() => openEmailModal(issue)}
+                        className="bg-[#D94E28] hover:bg-[#b83d1b] text-white border border-[#121316] px-3 py-1.5 font-bold cursor-pointer"
+                      >
+                        ✉ Legal Email
+                      </button>
+                      <button
+                        onClick={() => onUpvote(issue.reference_id)}
+                        className="bg-white hover:bg-[#121316] hover:text-white text-[#121316] border border-[#121316] px-3 py-1.5 font-bold cursor-pointer"
+                      >
+                        ▲ Upvote ({issue.upvotes || 1})
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-
-            {/* Dynamic Sidebar */}
-            <aside className="lg:col-span-4 space-y-6">
-              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow">
-                <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-[#121316] pb-3 mb-4 border-b-2 border-[#121316]">
-                  // TOP ENDORSED DOCKETS (LIVE)
-                </h3>
-                <div className="space-y-3">
-                  {issues
-                    .slice()
-                    .sort((a, b) => (b.upvotes || 1) - (a.upvotes || 1))
-                    .slice(0, 5)
-                    .map((item, idx) => (
-                      <div key={item.reference_id} className="flex items-start gap-3 pb-3 border-b border-[#D8D4C8] last:border-b-0 last:pb-0">
-                        <span className="w-6 h-6 bg-[#121316] text-white font-mono font-bold text-xs flex items-center justify-center shrink-0">
-                          0{idx + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-sm text-[#121316] truncate">
-                            {item.reference_id} — {item.category}
-                          </p>
-                          <span className="font-mono text-[11px] text-[#D94E28] font-semibold">
-                            {item.jurisdiction} // {item.upvotes || 1} ENDORSEMENTS
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                ))}
               </div>
-
-              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow">
-                <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-[#121316] pb-3 mb-4 border-b-2 border-[#121316]">
-                  // LIVE CORPORATION SUMMARY
-                </h3>
-                <div className="space-y-3">
-                  {municipalityBreakdown.map((m) => (
-                    <div key={m.city} className="bg-[#F5F3EE] border border-[#121316] p-3 font-mono text-xs">
-                      <div className="flex justify-between font-bold text-[#121316]">
-                        <span>{m.city}</span>
-                        <span>{m.total} DOCKETS</span>
-                      </div>
-                      <div className="mt-1 flex justify-between text-[11px] text-[#4A4D55]">
-                        <span>Active: {m.pending}</span>
-                        <span className="text-[#1B4332] font-bold">Resolved: {m.resolved}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </aside>
+            )}
           </div>
         )}
 
-        {/* TAB 2: GIS MAP */}
+        {/* TAB 2: MAP */}
         {activeTab === 'map' && (
-          <div className="bg-white border-2 border-[#121316] hard-shadow overflow-hidden h-[540px]">
+          <div className="bg-white border-2 border-[#121316] hard-shadow overflow-hidden h-[500px]">
             <IssueMap issues={filteredIssues} />
           </div>
         )}
 
-        {/* TAB 3: 100% DYNAMIC ANALYTICS */}
+        {/* TAB 3: ANALYTICS */}
         {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
-                <span className="font-mono text-xs uppercase text-[#4A4D55]">Total Logged Issues</span>
-                <p className="font-display text-3xl font-bold text-[#121316] mt-1">{totalCount}</p>
+          <div className="space-y-5">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              <div className="bg-white border-2 border-[#121316] p-4 hard-shadow-sm">
+                <span className="font-mono text-[11px] uppercase text-[#4A4D55]">Total</span>
+                <p className="font-display text-2xl sm:text-3xl font-bold text-[#121316] mt-1">{totalCount}</p>
               </div>
-              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
-                <span className="font-mono text-xs uppercase text-[#4A4D55]">Verified &amp; Open</span>
-                <p className="font-display text-3xl font-bold text-[#D94E28] mt-1">{verifiedOpenCount}</p>
+              <div className="bg-white border-2 border-[#121316] p-4 hard-shadow-sm">
+                <span className="font-mono text-[11px] uppercase text-[#4A4D55]">Open</span>
+                <p className="font-display text-2xl sm:text-3xl font-bold text-[#D94E28] mt-1">{verifiedOpenCount}</p>
               </div>
-              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
-                <span className="font-mono text-xs uppercase text-[#4A4D55]">Resolved Dockets</span>
-                <p className="font-display text-3xl font-bold text-[#1B4332] mt-1">{resolvedCount}</p>
-              </div>
-              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow-sm">
-                <span className="font-mono text-xs uppercase text-[#4A4D55]">Mean AI Confidence</span>
-                <p className="font-display text-3xl font-bold text-[#121316] mt-1">{avgConfidence}%</p>
+              <div className="bg-white border-2 border-[#121316] p-4 hard-shadow-sm">
+                <span className="font-mono text-[11px] uppercase text-[#4A4D55]">Resolved</span>
+                <p className="font-display text-2xl sm:text-3xl font-bold text-[#1B4332] mt-1">{resolvedCount}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
-                <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
-                  Live Dockets by Municipal Corporation
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow">
+                <h3 className="font-display text-base font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
+                  By Municipality
                 </h3>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {municipalityBreakdown.map((item) => (
-                    <div key={item.city} className="space-y-1.5">
+                    <div key={item.city} className="space-y-1">
                       <div className="flex justify-between font-mono text-xs">
-                        <span className="font-bold text-[#121316]">{item.city}</span>
-                        <span>{item.total} REPORTS ({Math.round((item.total / (totalCount || 1)) * 100)}%)</span>
+                        <span className="font-bold">{item.city}</span>
+                        <span>{item.total}</span>
                       </div>
-                      <div className="w-full h-3 bg-[#F5F3EE] border border-[#121316]">
+                      <div className="w-full h-2.5 bg-[#F5F3EE] border border-[#121316]">
                         <div
                           className="h-full bg-[#D94E28]"
                           style={{ width: `${Math.min(100, (item.total / (totalCount || 1)) * 100)}%` }}
@@ -362,18 +267,18 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                 </div>
               </div>
 
-              <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
-                <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
-                  Live Dockets by Departmental Wing
+              <div className="bg-white border-2 border-[#121316] p-5 hard-shadow">
+                <h3 className="font-display text-base font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
+                  By Department
                 </h3>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {categoryBreakdown.map((item) => (
-                    <div key={item.category} className="space-y-1.5">
+                    <div key={item.category} className="space-y-1">
                       <div className="flex justify-between font-mono text-xs">
-                        <span className="font-bold text-[#121316]">{item.category}</span>
-                        <span>{item.total} REPORTS ({Math.round((item.total / (totalCount || 1)) * 100)}%)</span>
+                        <span className="font-bold">{item.category}</span>
+                        <span>{item.total}</span>
                       </div>
-                      <div className="w-full h-3 bg-[#F5F3EE] border border-[#121316]">
+                      <div className="w-full h-2.5 bg-[#F5F3EE] border border-[#121316]">
                         <div
                           className="h-full bg-[#121316]"
                           style={{ width: `${Math.min(100, (item.total / (totalCount || 1)) * 100)}%` }}
@@ -387,46 +292,31 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
           </div>
         )}
 
-        {/* TAB 4: 100% DYNAMIC AUDIT HISTORY */}
+        {/* TAB 4: HISTORY */}
         {activeTab === 'history' && (
-          <div className="bg-white border-2 border-[#121316] p-6 hard-shadow">
-            <h3 className="font-display text-lg font-bold text-[#121316] mb-4 pb-2 border-b-2 border-[#121316]">
-              Chronological PostgreSQL Dispatch Ledger ({issues.length} Records)
-            </h3>
+          <div className="bg-white border-2 border-[#121316] p-4 sm:p-6 hard-shadow">
             <div className="divide-y divide-[#D8D4C8] font-mono text-xs">
               {issues.map((item) => (
-                <div key={item.id || item.reference_id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex items-start sm:items-center gap-3">
+                <div key={item.id || item.reference_id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={item.image_url}
                       alt={item.reference_id}
-                      className="w-12 h-12 object-cover border border-[#121316] shrink-0"
+                      className="w-10 h-10 object-cover border border-[#121316] shrink-0"
                     />
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-bold bg-[#121316] text-white px-2 py-0.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold bg-[#121316] text-white px-1.5 py-0.5 text-[10px]">
                           {item.reference_id}
                         </span>
-                        <span className="font-bold text-[#D94E28]">
-                          [{item.category}]
-                        </span>
-                        <span className="text-[#121316] font-bold">
-                          &rarr; {item.jurisdiction}
-                        </span>
-                        <span className="text-[#1B4332]">
-                          ({item.department_email})
+                        <span className="font-bold text-[#D94E28] truncate">
+                          {item.jurisdiction}
                         </span>
                       </div>
-                      <p className="text-[#4A4D55] mt-1 line-clamp-1">
-                        {item.ai_summary || item.description}
-                      </p>
+                      <p className="text-[#4A4D55] truncate mt-0.5">{item.category}</p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="inline-block bg-[#F5F3EE] border border-[#121316] px-2 py-1 font-bold">
-                      {item.date}
-                    </span>
-                  </div>
+                  <span className="text-[11px] text-[#4A4D55] shrink-0">{item.date}</span>
                 </div>
               ))}
             </div>
@@ -437,27 +327,22 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
       {/* Legal Email Modal */}
       {draftModalIssue && (
         <div className="fixed inset-0 z-50 bg-[#121316]/80 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-[#121316] hard-shadow max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border-2 border-[#121316] hard-shadow max-w-xl w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b-2 border-[#121316] pb-3">
-              <div>
-                <span className="font-mono text-[10px] font-bold uppercase text-[#D94E28]">
-                  // STATUTORY ESCALATION DISPATCH
-                </span>
-                <h3 className="font-display text-xl font-bold text-[#121316]">
-                  Official Notice — Docket #{draftModalIssue.reference_id}
-                </h3>
-              </div>
+              <h3 className="font-display text-lg font-bold text-[#121316]">
+                Legal Notice — #{draftModalIssue.reference_id}
+              </h3>
               <button
                 onClick={() => setDraftModalIssue(null)}
-                className="font-mono text-xs font-bold bg-[#121316] text-white px-3 py-1 cursor-pointer"
+                className="font-mono text-xs font-bold bg-[#121316] text-white px-2.5 py-1 cursor-pointer"
               >
-                ✕ CLOSE
+                ✕
               </button>
             </div>
 
             <div className="space-y-3 font-mono text-xs">
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">To Nodal Email:</label>
+                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">To:</label>
                 <input
                   type="text"
                   value={draftTo}
@@ -475,9 +360,9 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">Editable Legal Notice:</label>
+                <label className="block text-[10px] uppercase font-bold text-[#4A4D55] mb-1">Notice:</label>
                 <textarea
-                  rows={10}
+                  rows={8}
                   value={draftBody}
                   onChange={(e) => setDraftBody(e.target.value)}
                   className="w-full p-3 bg-[#F5F3EE] border border-[#121316] leading-relaxed"
@@ -485,7 +370,7 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <button
                 onClick={() => {
                   const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
@@ -493,9 +378,9 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                   )}&su=${encodeURIComponent(draftSubject)}&body=${encodeURIComponent(draftBody)}`;
                   window.open(url, '_blank', 'noopener,noreferrer');
                 }}
-                className="bg-[#D94E28] hover:bg-[#b83d1b] text-white font-mono text-xs uppercase font-bold py-3 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
+                className="bg-[#D94E28] text-white font-mono text-xs uppercase font-bold py-3 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
               >
-                Open in Gmail Web &rarr;
+                Open in Gmail &rarr;
               </button>
               <button
                 onClick={() => {
@@ -505,7 +390,7 @@ ${user?.email || 'Dispatched via CityLense Public Registry'}`;
                 }}
                 className="bg-[#121316] text-white font-mono text-xs uppercase font-bold py-3 border-2 border-[#121316] hard-shadow-sm cursor-pointer"
               >
-                Open Default Mail App
+                Open Mail App
               </button>
             </div>
           </div>
