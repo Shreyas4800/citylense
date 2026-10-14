@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-paper: #F5F3EE;
+  --bg-surface: #FFFFFF;
+  --ink-900: #121316;
+  --ink-600: #4A4D55;
+  --border-stone: #D8D4C8;
+  --accent-vermilion: #D94E28;
+  --accent-forest: #1B4332;
+}
+
+body {
+  background-color: var(--bg-paper);
+  color: var(--ink-900);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .font-display {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bg-grid-pattern {
+  background-size: 28px 28px;
+  background-image: 
+    linear-gradient(to right, rgba(18, 19, 22, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(18, 19, 22, 0.05) 1px, transparent 1px);
+}
+
+.hard-shadow {
+  box-shadow: 4px 4px 0px #121316;
+}
+
+.hard-shadow-sm {
+  box-shadow: 2px 2px 0px #121316;
+}
+
+.leaflet-container {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  background: #e5e3dc !important;
+}
